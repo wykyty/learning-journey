@@ -40,6 +40,25 @@
 - 数据集：XSum（摘要任务，需要 encoder + decoder 输入对）
 - 特点：decoder 激活包含 cross-attention 信息，与 encoder 激活本质不同
 
+### 5. [training_sae_t5_demp.ipynb]
+改动清单
+
+| 项目              | 原版                            | Demo 版                      |
+| --------------- | ----------------------------- | --------------------------- |
+| 模型              | t5-large (d_model=1024, 24 层) | t5-small (d_model=512, 6 层) |
+| Hook 点位         | decoder.12.hook_mlp_out       | decoder.3.hook_mlp_out      |
+| SAE 扩展维度        | d_sae=16384 (16 倍扩展)          | d_sae=1024 (2 倍扩展)          |
+| 总训练步数           | 50000                         | 200                         |
+| 批次大小 Batch size | 4096                          | 512                         |
+| 学习率             | 1e-4                          | 1e-3                        |
+| L1 预热步数         | 2500 步                        | 10 步                        |
+| 上下文 / 目标序列长度    | 128 / 64                      | 64 / 32                     |
+| 归一化估计批次数量       | 100                           | 5                           |
+| 日志打印频率          | 每 100 步                       | 每 10 步                      |
+| Wandb 日志        | 完整集成                          | 直接移除                        |
+| 评估可视化图表         | 6 张子图 + 完整详细分析                | 3 张子图（loss/EV/L0）           |
+| 代码单元格数量         | 约 29 个                        | 17 个                        |
+| 导入依赖            | 分散多单元格                        | 统一合并至单个单元格                  |
 ## TransformerLens vs nnsight 对比
 
 | | TransformerLens | nnsight |

@@ -1,6 +1,6 @@
 # 01 - Sparse Autoencoders
 
-本目录包含三个 SAE 训练笔记本，覆盖不同的模型架构和激活提取方案。
+本目录包含四个 SAE 训练笔记本，覆盖不同的模型架构、激活提取方案和目标层。
 
 ## Notebooks
 
@@ -15,21 +15,30 @@
 
 ### 2. [training_sae_t5_transformerlens.ipynb](training_sae_t5_transformerlens.ipynb)
 
-使用 **TransformerLens** 的 `HookedEncoderDecoder` 提取 T5-large 内部激活，手动训练 SAE。
+使用 **TransformerLens** 提取 T5-large **encoder** 激活，手动训练 SAE。
 
 - 模型加载：`HookedEncoderDecoder.from_pretrained("google-t5/t5-large")`
 - 激活提取：`model.run_with_cache(text)` -> `cache["encoder.12.hook_mlp_out"]`
-- 输入格式：直接传字符串
+- 数据集：C4（纯文本，只需 encoder 输入）
 - 优化：`names_filter` 只缓存目标 hook，节省显存
 
 ### 3. [training_sae_t5_nnsight.ipynb](training_sae_t5_nnsight.ipynb)
 
-使用 **nnsight** 提取 T5-large 内部激活，手动训练 SAE。
+使用 **nnsight** 提取 T5-large **encoder** 激活，手动训练 SAE。
 
 - 模型加载：`LanguageModel("google-t5/t5-large", automodel=AutoModelForSeq2SeqLM)`
 - 激活提取：`model.trace(input_ids)` -> `model.encoder.block[12].layer[1].output.save()`
-- 输入格式：需要先 tokenize 为 token IDs
+- 数据集：C4
 - 优势：支持更细粒度的干预操作
+
+### 4. [training_sae_t5_decoder_transformerlens.ipynb](training_sae_t5_decoder_transformerlens.ipynb)
+
+使用 **TransformerLens** 提取 T5-large **decoder** 激活，手动训练 SAE。
+
+- 模型加载：同上，`HookedEncoderDecoder`
+- 激活提取：`model.run_with_cache(enc_ids, decoder_input=dec_ids)` -> `cache["decoder.12.hook_mlp_out"]`
+- 数据集：XSum（摘要任务，需要 encoder + decoder 输入对）
+- 特点：decoder 激活包含 cross-attention 信息，与 encoder 激活本质不同
 
 ## TransformerLens vs nnsight 对比
 
@@ -40,8 +49,17 @@
 | 输入格式 | 字符串 | Token IDs |
 | 记忆优化 | `names_filter` 按需缓存 | 逐个 `.save()` |
 | Logit lens | `model.W_E` 直接获取 | `t5_model.decoder.embed_tokens.weight` |
+| Decoder 支持 | `run_with_cache(enc, decoder_input=dec)` | `model.trace(enc_ids)` + decoder proxy |
 
-两个版本的 SAE 实现（类、训练循环、评估）完全一致，仅激活提取方式不同。
+## Encoder vs Decoder SAE 对比
+
+| | Encoder SAE | Decoder SAE |
+|---|---|---|
+| Hook 点 | `encoder.N.hook_mlp_out` | `decoder.N.hook_mlp_out` |
+| 输入 | 只需源文本 | 需要源文本 + 目标文本 |
+| 数据集 | C4（任意文本） | XSum（摘要任务） |
+| 激活特点 | 纯编码表示 | 包含 cross-attention 到 encoder 的信息 |
+| 应用场景 | 理解模型如何编码输入 | 理解模型如何生成输出 |
 
 ## 通用超参数
 

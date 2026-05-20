@@ -4,7 +4,7 @@
 
 ## Notebooks
 
-### 1. [training_a_sparse_autoencoder.ipynb](training_a_sparse_autoencoder.ipynb)
+### 1.0 [training_a_sparse_autoencoder.ipynb](01_training_a_sparse_autoencoder.ipynb)
 
 使用 **SAELens** 在 decoder-only 模型 (tiny-stories-1L-21M) 上训练 SAE 的入门教程。
 
@@ -12,6 +12,40 @@
 - 激活提取：SAELens 内置的 `SAETrainingRunner` + `ActivationsStore`
 - 目标层：`blocks.0.hook_mlp_out`
 - 无需手动实现 SAE，开箱即用
+
+### 2.0 [train_sae_t5](02_training_sae_t5_decoder.ipynb)
+核心设计思路：
+
+  1. 模型加载: 用 HookedEncoderDecoder.from_pretrained("google-t5/t5-large") 加载 T5
+  2. 激活收集: 用 XSum 数据集（document→summary），分别 tokenize 后通过 run_with_cache 从 decoder.12.hook_mlp_out 收集
+  decoder 侧激活
+  3. SAE 架构: 直接用 SAELens 的 StandardTrainingSAE + StandardTrainingSAEConfig，带 decoder 行归一化初始化和 L1
+  稀疏损失
+  4. 训练循环: 用 SAELens 的 training_forward_pass(TrainStepInput(...)) 计算 loss，手动做 backward + grad clip +
+  optimizer step，跟 SAETrainer 内部逻辑一致
+  5. 评估: explained variance、L0、feature density、dead features、logit lens
+
+  跟参考 notebook 的关键区别是：不能用 SAETrainingRunner（它不支持
+  HookedEncoderDecoder），所以手动写了训练循环，但用的是 SAELens 原生的 SAE 类和 loss 计算。
+
+  默认配置 10_000 步，batch_size=4096 tokens，可以在 Config cell 里调整。跑一下试试看能不能通。
+
+## 3.0 [train_topksae_t5](03_training_batchtopk_sae_t5_decoder.ipynb)
+● Notebook 已创建: 01-sparse-autoencoders/03_training_batchtopk_sae_t5_decoder.ipynb
+
+  跟 Standard SAE 版本的关键区别：
+
+| SAE 类       | StandardTrainingSAE | BatchTopKTrainingSAE           |
+|--------------|---------------------|--------------------------------|
+| 稀疏控制     | L1 coefficient      | k (float, batch 平均激活数)    |
+| Loss         | MSE + L1            | MSE + dead neuron aux loss     |
+| coefficients | {"l1": ...}         | {} (空 dict)                   |
+| 额外指标     | —                   | topk_threshold (EMA)           |
+| L1 warm-up   | 有                  | 无                             |
+| 推理格式     | —                   | 保存为 JumpReLU (用 threshold) |
+
+  训练循环模式完全一样，只是 TrainStepInput 里的 coefficients 传空 dict，loss 和 threshold 更新都由
+  training_forward_pass 内部自动处理。
 
 ### 2. [training_sae_t5_transformerlens.ipynb](training_sae_t5_transformerlens.ipynb)
 
@@ -59,6 +93,7 @@
 | 评估可视化图表         | 6 张子图 + 完整详细分析                | 3 张子图（loss/EV/L0）           |
 | 代码单元格数量         | 约 29 个                        | 17 个                        |
 | 导入依赖            | 分散多单元格                        | 统一合并至单个单元格                  |
+
 ## TransformerLens vs nnsight 对比
 
 | | TransformerLens | nnsight |

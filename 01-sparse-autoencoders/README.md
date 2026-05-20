@@ -40,7 +40,7 @@
 - 数据集：XSum（摘要任务，需要 encoder + decoder 输入对）
 - 特点：decoder 激活包含 cross-attention 信息，与 encoder 激活本质不同
 
-### 5. [training_sae_t5_demp.ipynb]
+### 5. [training_sae_t5_demo.ipynb]
 改动清单
 
 | 项目              | 原版                            | Demo 版                      |
